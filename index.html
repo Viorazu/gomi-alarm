@@ -408,7 +408,7 @@ function renderHeader() {
     todayEl.innerHTML = todayItems.map(g => {
       const missed = isMissed(g.name);
       return `<div class="today-item">
-        <strong>${g.emoji} ${g.name}</strong>
+        <strong>${getIcon(g)} ${g.name}</strong>
         <button class="missed-btn ${missed?'active':''}" onclick="toggleMissed('${g.name}')">
           ${missed ? '⚠️ 出し忘れた' : '出し忘れた'}
         </button>
@@ -434,7 +434,7 @@ function renderHeader() {
     let dateStr = diff <= 1 ? '準備はいい？' : formatDate(nd) + `（あと${diff}日）`;
     const missedAlert = wasMissedLast(g) ? `<div class="missed-alert">⚠️ 前回出し忘れてる！絶対忘れるな！</div>` : '';
     return `<div class="next-card" style="margin-bottom:${idx===0?'8px':'20px'}">
-      <div class="next-emoji">${g.emoji}</div>
+      <div class="next-emoji">${getIcon(g)}</div>
       <div style="flex:1">
         <div class="next-label">NEXT COLLECTION</div>
         <div class="next-msg">${msg}</div>
@@ -459,7 +459,7 @@ function renderList() {
     const on = g.enabled !== false;
     return `<div class="gomi-card">
       <div class="gomi-card-stripe" style="background:${g.color}"></div>
-      <div class="gomi-emoji">${g.emoji}</div>
+      <div class="gomi-emoji">${getIcon(g)}</div>
       <div class="gomi-info">
         <div class="gomi-name">${g.name}</div>
         <div class="gomi-days">${daySpans}${weeksBadge}</div>
@@ -471,6 +471,17 @@ function renderList() {
     </div>`;
   }).join('');
   renderHeader();
+}
+
+
+// kidsIconsからアイコンを取得（なければ絵文字）
+function getIcon(g) {
+  const kids = JSON.parse(localStorage.getItem('kidsIcons') || '[]');
+  const found = kids.find(k => k.name === g.name);
+  if (found && found.imageDataUrl) {
+    return `<img src="${found.imageDataUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:8px;">`;
+  }
+  return g.emoji;
 }
 
 function deleteGomi(i) {
