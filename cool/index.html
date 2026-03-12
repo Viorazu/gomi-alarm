@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ゴミ出しアラーム</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --text: #111;
+    --muted: #999;
+    --border: #e8e8e8;
+    --surface: #fff;
+    --card: #fff;
+    --accent: #111;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    background: #fff;
+    min-height: 100vh;
+    padding: 0 0 80px;
+  }
+
+  /* ヘッダークロック */
+  .clock-header {
+    padding: 48px 24px 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .today-date {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    margin-bottom: 8px;
+  }
+  .clock-time {
+    font-family: 'Space Mono', monospace;
+    font-size: 4rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin-bottom: 6px;
+    color: #111;
+  }
+  .today-dow {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* 曜日テーマ — 全部白 */
+  body.day-0, body.day-1, body.day-2, body.day-3,
+  body.day-4, body.day-5, body.day-6 { background: #fff; }
+
+  body.day-0 .today-dow, body.day-1 .today-dow, body.day-2 .today-dow,
+  body.day-3 .today-dow, body.day-4 .today-dow, body.day-5 .today-dow,
+  body.day-6 .today-dow { color: var(--muted); }
+
+  body.day-0 .accent, body.day-1 .accent, body.day-2 .accent,
+  body.day-3 .accent, body.day-4 .accent, body.day-5 .accent,
+  body.day-6 .accent { color: #111; }
+
+  /* 次のゴミバナー */
+  .next-card {
+    margin: 0;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #fff;
+  }
+  .next-card .next-emoji { font-size: 1.8rem; width: 36px; text-align: center; }
+  .next-card .next-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    margin-bottom: 4px;
+  }
+  .next-card .next-msg { font-size: 0.95rem; font-weight: 600; color: #111; }
+  .next-card .next-date {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* 今日のゴミ */
+  .today-gomi {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: none;
+    background: #fafafa;
+  }
+  .today-gomi.visible { display: block; }
+  .today-gomi strong { font-size: 0.95rem; color: #111; }
+
+  /* 今日大丈夫 */
+  .all-clear {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .divider { display: none; }
+
+  /* 通知ボタン */
+  .notify-wrap { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+  .notify-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: none; color: #111;
+    border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 14px;
+    font-size: 0.8rem; font-weight: 500;
+    cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: border-color 0.2s;
+  }
+  .notify-btn:hover { border-color: #111; }
+  .notify-btn.granted { border-color: #111; color: #111; }
+
+  .section-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    padding: 20px 24px 10px;
+    text-transform: uppercase;
+  }
+
+  .gomi-list { display: flex; flex-direction: column; padding: 0 24px; gap: 0; }
+
+  .gomi-card {
+    background: #fff;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 16px 0;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto auto;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    overflow: visible;
+  }
+  .gomi-card-stripe { display: none; }
+  .gomi-emoji { font-size: 1.5rem; width: 32px; text-align: center; }
+  .gomi-info { min-width: 0; }
+  .gomi-name { font-weight: 600; font-size: 0.92rem; margin-bottom: 2px; color: #111; }
+  .gomi-days {
+    font-size: 0.7rem; color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+  .gomi-days span {
+    display: inline-block;
+    background: #f5f5f5;
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-right: 3px;
+  }
+  .weeks-badge {
+    display: inline-block;
+    background: #f5f5f5;
+    color: #999;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.65rem;
+    margin-left: 2px;
+    font-family: 'Space Mono', monospace;
+  }
+  .gomi-next-date { font-size: 0.68rem; color: var(--muted); font-family: 'Space Mono', monospace; margin-top: 2px; }
+
+  .toggle-btn {
+    width: 36px; height: 20px;
+    background: #e0e0e0;
+    border-radius: 10px; border: none;
+    cursor: pointer; position: relative;
+    transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle-btn::after {
+    content: ''; position: absolute;
+    width: 14px; height: 14px;
+    background: white; border-radius: 50%;
+    top: 3px; left: 3px; transition: transform 0.2s;
+  }
+  .toggle-btn.on { background: #111; }
+  .toggle-btn.on::after { transform: translateX(16px); }
+
+  .edit-btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 4px;
+    padding: 3px 8px; font-size: 0.68rem;
+    cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+  }
+  .edit-btn:hover { border-color: #111; color: #111; }
+
+  .delete-btn {
+    background: none; border: 1px solid transparent;
+    color: #ddd; border-radius: 4px;
+    padding: 3px 8px; font-size: 0.68rem;
+    cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+  }
+  .delete-btn:hover { border-color: #fcc; color: #e94560; }
+
+  .add-new-wrap { padding: 0 24px; margin-top: 8px; }
+  .add-new-btn {
+    background: none; border: 1px dashed var(--border);
+    color: var(--muted); border-radius: 8px;
+    padding: 12px; font-size: 0.85rem;
+    cursor: pointer; width: 100%;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s; margin: 0;
+  }
+  .add-new-btn:hover { border-color: #111; color: #111; }
+
+  /* フォーム */
+  .add-form {
+    background: #fafafa;
+    border: none;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    padding: 24px;
+    margin: 16px 0 0;
+  }
+  .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  label { font-size: 0.7rem; color: var(--muted); font-family: 'Space Mono', monospace; letter-spacing: 0.08em; }
+  input[type="text"], input[type="time"], select {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px; color: #111;
+    padding: 10px 12px; font-size: 0.9rem;
+    font-family: 'Inter', sans-serif;
+    outline: none; transition: border-color 0.2s; width: 100%;
+  }
+  input:focus, select:focus { border-color: #111; }
+  select option { background: #fff; color: #111; }
+  .day-checkboxes, .week-checkboxes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .day-check, .week-check { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .day-check input[type="checkbox"], .week-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: #111; cursor: pointer; }
+  .day-check span, .week-check span { font-size: 0.68rem; color: var(--muted); font-family: 'Space Mono', monospace; }
+  .week-note { font-size: 0.68rem; color: var(--muted); margin-top: 4px; font-family: 'Space Mono', monospace; }
+  .alarm-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .alarm-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .alarm-row input[type="time"] { width: 130px; flex-shrink: 0; }
+  .alarm-row select { width: 150px; flex-shrink: 0; }
+  .rm-alarm { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; width: 26px; height: 26px; cursor: pointer; font-size: 0.9rem; transition: color 0.2s; }
+  .rm-alarm:hover { color: #e94560; }
+  .add-alarm-btn { background: none; border: 1px dashed var(--border); color: var(--muted); border-radius: 6px; padding: 8px; font-size: 0.78rem; cursor: pointer; width: 100%; margin-top: 8px; font-family: 'Inter', sans-serif; transition: all 0.2s; }
+  .add-alarm-btn:hover { color: #111; border-color: #111; }
+  .emoji-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .emoji-opt { font-size: 1.3rem; width: 38px; height: 38px; border-radius: 6px; border: 1px solid var(--border); background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; }
+  .emoji-opt.selected { border-color: #111; }
+  .color-dots { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform 0.15s; }
+  .color-dot:hover { transform: scale(1.2); }
+  .color-dot.selected { border-color: #111; transform: scale(1.15); }
+  .save-btn { background: #111; color: #fff; border: none; border-radius: 6px; padding: 12px; font-size: 0.92rem; font-weight: 600; cursor: pointer; width: 100%; font-family: 'Inter', sans-serif; transition: background 0.2s; margin-top: 8px; }
+  .save-btn:hover { background: #333; }
+  .cancel-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 10px; font-size: 0.85rem; cursor: pointer; width: 100%; font-family: 'Inter', sans-serif; margin-top: 8px; transition: all 0.2s; }
+  .cancel-btn:hover { border-color: #111; color: #111; }
+  .form-title { font-weight: 600; font-size: 1rem; margin-bottom: 18px; color: #111; }
+
+  /* 出し忘れ */
+  .missed-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; padding: 3px 8px; font-size: 0.68rem; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.2s; white-space: nowrap; }
+  .missed-btn:hover { border-color: #e94560; color: #e94560; }
+  .missed-btn.active { border-color: #e94560; color: #e94560; font-weight: 600; }
+
+  .today-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
+  .today-item + .today-item { border-top: 1px solid var(--border); }
+
+  .missed-alert { font-size: 0.72rem; color: #e94560; font-weight: 600; margin-top: 3px; font-family: 'Space Mono', monospace; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #111; color: #fff; padding: 10px 22px; border-radius: 32px; font-weight: 600; font-size: 0.85rem; transition: transform 0.3s; z-index: 999; white-space: nowrap; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* リセットボタン */
+  div[style*="データをリセット"] { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+
+  /* 画像アップロード */
+  .img-upload-area {
+    width: 56px; height: 56px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    background: #fafafa;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; overflow: hidden; position: relative;
+    flex-shrink: 0; transition: border-color 0.2s;
+  }
+  .img-upload-area:hover { border-color: #111; }
+  .img-upload-area img { width: 100%; height: 100%; object-fit: cover; border-radius: 7px; }
+  .img-upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .img-upload-hint { font-size: 0.55rem; color: #ccc; text-align: center; line-height: 1.4; pointer-events: none; }
+  .img-clear-btn {
+    background: none; border: none; color: #ccc;
+    font-size: 0.65rem; cursor: pointer; padding: 0;
+    font-family: 'Space Mono', monospace;
+    transition: color 0.2s; display: block; margin-top: 2px; text-align: center;
+  }
+  .img-clear-btn:hover { color: #e94560; }
+
+</style>
+</head>
+<body>
+
+<!-- 時計ヘッダー -->
+<div class="clock-header">
+  <div class="today-date" id="todayDate"></div>
+  <div class="clock-time" id="clockTime">00:00</div>
+  <div class="today-dow" id="todayDow"></div>
+</div>
+
+<!-- 今日のゴミ -->
+<div id="allClear"></div>
+<div class="today-gomi" id="todayGomi"></div>
+
+<!-- 次のゴミ -->
+<div id="nextCards"></div>
+
+<hr class="divider">
+
+<div class="notify-wrap">
+  <button class="notify-btn" id="notifyBtn" onclick="requestNotify()">🔔 通知を許可する</button>
+</div>
+
+<div class="section-title">登録済みゴミ</div>
+<div class="gomi-list" id="gomiList"></div>
+
+<div class="add-new-wrap">
+  <button class="add-new-btn" onclick="openForm(null)">＋ ゴミの種類を追加</button>
+</div>
+
+<div class="add-form" id="addForm" style="display:none">
+  <div class="form-title" id="formTitle">新しいゴミを追加</div>
+  <div class="form-row">
+    <label>アイコン</label>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button type="button" onclick="setIconMode('emoji')" id="modeEmoji" style="flex:1;padding:7px;border-radius:5px;border:1px solid #111;background:#111;color:#fff;font-size:0.78rem;cursor:pointer;font-family:'Space Mono',monospace">絵文字</button>
+      <button type="button" onclick="setIconMode('image')" id="modeImage" style="flex:1;padding:7px;border-radius:5px;border:1px solid #e8e8e8;background:#fff;color:#999;font-size:0.78rem;cursor:pointer;font-family:'Space Mono',monospace">画像をアップロード</button>
+    </div>
+    <div id="iconModeEmoji"><div class="emoji-row" id="emojiRow"></div></div>
+    <div id="iconModeImage" style="display:none">
+      <div id="imgPreviewArea" style="width:72px;height:72px;border:1px dashed #e8e8e8;border-radius:8px;background:#fafafa;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;cursor:pointer">
+        <span id="imgPreviewHint" style="font-size:0.65rem;color:#ccc;text-align:center;line-height:1.5">📷<br>タップして<br>選ぶ</span>
+        <img id="imgPreviewImg" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:7px">
+        <input type="file" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer" onchange="handleFormImage(this.files[0])">
+      </div>
+      <button type="button" onclick="clearFormImage()" style="margin-top:6px;background:none;border:none;color:#ccc;font-size:0.72rem;cursor:pointer;font-family:'Space Mono',monospace">✕ 画像を削除</button>
+    </div>
+  </div>
+  <div class="form-row"><label>名前</label><input type="text" id="inputName" placeholder="例：可燃ごみ"></div>
+  <div class="form-row"><label>色</label><div class="color-dots" id="colorDots"></div></div>
+  <div class="form-row"><label>収集曜日（複数可）</label><div class="day-checkboxes" id="dayCheckboxes"></div></div>
+  <div class="form-row">
+    <label>隔週設定（毎週なら全部外す）</label>
+    <div class="week-checkboxes" id="weekCheckboxes"></div>
+    <div class="week-note">チェックした週だけ収集。毎週の場合は全部外してOK。</div>
+  </div>
+  <div class="form-row">
+    <label>アラーム（何日前の何時）</label>
+    <div class="alarm-rows" id="alarmRows"></div>
+    <button class="add-alarm-btn" onclick="addAlarmRow()">＋ アラームを追加</button>
+  </div>
+  <button class="save-btn" onclick="saveGomi()">保存</button>
+  <button class="cancel-btn" onclick="cancelForm()">キャンセル</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DAYS = ['日','月','火','水','木','金','土'];
+const DAYS_FULL = ['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日'];
+const EMOJIS = ['🔥','♻️','📦','🍶','🥫','🪣','🧴','🗞️','👕','🔋','💡','🪨','📱','💻','📺','🖨️','🎮','🛏','🚿','🪑','🛋️','🔌'];
+const COLORS = ['#e94560','#f5a623','#4ecdc4','#a29bfe','#fd79a8','#55efc4','#fdcb6e','#74b9ff','#e17055','#00b894'];
+
+let gomiData = JSON.parse(localStorage.getItem('gomiData') || '[]');
+let editIndex = null, selectedEmoji = EMOJIS[0], selectedColor = COLORS[0], alarmRows = [];
+
+function saveData() { localStorage.setItem('gomiData', JSON.stringify(gomiData)); }
+function showToast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// 背景を今日の曜日に合わせる
+function applyDayTheme() {
+  const dow = new Date().getDay();
+  document.body.className = `day-${dow}`;
+}
+
+// 時計更新
+function updateClock() {
+  const now = new Date();
+  const dow = now.getDay();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  const ss = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clockTime').textContent = `${hh}:${mm}`;
+  document.getElementById('todayDow').textContent = DAYS_FULL[dow];
+  document.getElementById('todayDate').textContent =
+    `${now.getFullYear()} / ${now.getMonth()+1} / ${now.getDate()}`;
+
+  // 日付変わり目で背景更新
+  const currentDow = `day-${dow}`;
+  if (!document.body.classList.contains(currentDow)) applyDayTheme();
+}
+
+// 第N週判定
+function getNthWeekOfMonth(date) {
+  const dow = date.getDay();
+  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  const offset = (dow - first.getDay() + 7) % 7;
+  return Math.floor((date.getDate() - (1 + offset)) / 7) + 1;
+}
+
+function isCollectionDay(g, date) {
+  if (!g.days.includes(DAYS[date.getDay()])) return false;
+  if (g.weeks && g.weeks.length > 0 && !g.weeks.includes(getNthWeekOfMonth(date))) return false;
+  return true;
+}
+
+function getNextDate(g) {
+  const now = new Date();
+  for (let i = 1; i <= 60; i++) {
+    const d = new Date(now); d.setDate(now.getDate() + i);
+    if (isCollectionDay(g, d)) return d;
+  }
+  return null;
+}
+
+function formatDate(d) {
+  return `${d.getMonth()+1}/${d.getDate()}(${DAYS[d.getDay()]})`;
+}
+
+// 出し忘れフラグ：{ "ゴミ名_YYYY-MM-DD": true }
+let missedFlags = JSON.parse(localStorage.getItem('missedFlags') || '{}');
+function saveMissed() { localStorage.setItem('missedFlags', JSON.stringify(missedFlags)); }
+
+function todayKey(gName) {
+  const d = new Date();
+  return `${gName}_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function toggleMissed(gName) {
+  const key = todayKey(gName);
+  if (missedFlags[key]) delete missedFlags[key]; else missedFlags[key] = true;
+  saveMissed(); renderHeader(); renderList();
+}
+
+function isMissed(gName) { return !!missedFlags[todayKey(gName)]; }
+
+// 前回出し忘れたか（直前の収集日に出し忘れフラグがあるか）
+function wasMissedLast(g) {
+  const now = new Date();
+  for (let i = 1; i <= 60; i++) {
+    const d = new Date(now); d.setDate(now.getDate() - i);
+    if (isCollectionDay(g, d)) {
+      const key = `${g.name}_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return !!missedFlags[key];
+    }
+  }
+  return false;
+}
+
+function renderHeader() {
+  const now = new Date();
+  const today = new Date(now); today.setHours(0,0,0,0);
+
+  // 今日が収集日のゴミ
+  const todayItems = gomiData.filter(g => g.enabled !== false && isCollectionDay(g, today));
+  const todayEl = document.getElementById('todayGomi');
+  const allClearEl = document.getElementById('allClear');
+
+  if (todayItems.length > 0) {
+    allClearEl.innerHTML = '';
+    todayEl.classList.add('visible');
+    todayEl.innerHTML = todayItems.map(g => {
+      const missed = isMissed(g.name);
+      return `<div class="today-item">
+        <strong>${getIcon(g)} ${g.name}</strong>
+        <button class="missed-btn ${missed?'active':''}" onclick="toggleMissed('${g.name}')">
+          ${missed ? '⚠️ 出し忘れた' : '出し忘れた'}
+        </button>
+      </div>`;
+    }).join('');
+  } else {
+    todayEl.classList.remove('visible');
+    todayEl.innerHTML = '';
+    allClearEl.innerHTML = '<div class="all-clear">✅ 今日は大丈夫</div>';
+  }
+
+  // 次のゴミ（最大2件、近い順）
+  const active = gomiData.filter(g => g.enabled !== false && g.days.length > 0);
+  const withDates = active.map(g => ({ g, nd: getNextDate(g) })).filter(x => x.nd).sort((a,b) => a.nd - b.nd);
+  const top2 = withDates.slice(0, 2);
+
+  const container = document.getElementById('nextCards');
+  if (!top2.length) { container.innerHTML = ''; return; }
+
+  container.innerHTML = top2.map(({ g, nd }, idx) => {
+    const diff = Math.round((nd - now) / (1000*60*60*24));
+    let msg = diff <= 1 ? `明日は ${g.emoji} ${g.name}の日！` : `次は ${g.emoji} ${g.name}`;
+    let dateStr = diff <= 1 ? '準備はいい？' : formatDate(nd) + `（あと${diff}日）`;
+    const missedAlert = wasMissedLast(g) ? `<div class="missed-alert">⚠️ 前回出し忘れてる！絶対忘れるな！</div>` : '';
+    return `<div class="next-card" style="margin-bottom:${idx===0?'8px':'20px'}">
+      <div class="next-emoji">${getIcon(g)}</div>
+      <div style="flex:1">
+        <div class="next-label">NEXT COLLECTION</div>
+        <div class="next-msg">${msg}</div>
+        <div class="next-date">${dateStr}</div>
+        ${missedAlert}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderList() {
+  const list = document.getElementById('gomiList');
+  if (!gomiData.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px 0">まだ登録なし。下の「追加」から始めてね。</div>';
+    return;
+  }
+  list.innerHTML = gomiData.map((g, i) => {
+    const daySpans = g.days.map(d => `<span>${d}</span>`).join('');
+    const weeksBadge = (g.weeks && g.weeks.length > 0) ? `<span class="weeks-badge">第${g.weeks.join('・')}週</span>` : '';
+    const nd = getNextDate(g);
+    const nextStr = nd ? formatDate(nd) : '-';
+    const on = g.enabled !== false;
+    return `<div class="gomi-card">
+      <div class="gomi-card-stripe" style="background:${g.color}"></div>
+      <div class="gomi-emoji">${getIcon(g)}</div>
+      <div class="gomi-info">
+        <div class="gomi-name">${g.name}</div>
+        <div class="gomi-days">${daySpans}${weeksBadge}</div>
+        <div class="gomi-next-date">次回 ${nextStr}</div>
+      </div>
+      <button class="edit-btn" onclick="openForm(${i})">編集</button>
+      <button class="delete-btn" onclick="deleteGomi(${i})">削除</button>
+      <button class="toggle-btn ${on?'on':''}" onclick="toggleGomi(${i})"></button>
+    </div>`;
+  }).join('');
+  renderHeader();
+}
+
+
+// kidsIconsからアイコンを取得（なければ絵文字）
+
+
+function hasCustomIcon(g) {
+  const kids = JSON.parse(localStorage.getItem('kidsIcons') || '[]');
+  const found = kids.find(k => k.name === g.name);
+  return !!(found && found.imageDataUrl);
+}
+
+function renderIconArea(g, i) {
+  const useImage = hasCustomIcon(g);
+  const kids = JSON.parse(localStorage.getItem('kidsIcons') || '[]');
+  const found = kids.find(k => k.name === g.name);
+
+  if (useImage) {
+    // 画像モード
+    return `
+      <div class="img-upload-area" title="画像を変更" onclick="event.stopPropagation()">
+        <img src="${found.imageDataUrl}" alt="${g.name}">
+        <input type="file" accept="image/*" onchange="uploadIcon(${i}, this.files[0])">
+      </div>
+      <button class="img-clear-btn" onclick="clearIcon(${i})">絵文字に戻す</button>
+    `;
+  } else {
+    // 絵文字モード
+    return `
+      <div class="img-upload-area" title="画像をアップロード" onclick="event.stopPropagation()" style="background:#fafafa">
+        <span style="font-size:1.4rem">${g.emoji}</span>
+        <input type="file" accept="image/*" onchange="uploadIcon(${i}, this.files[0])">
+      </div>
+      <span class="img-upload-hint" style="font-size:0.55rem;color:#ccc;text-align:center">画像に<br>変更</span>
+    `;
+  }
+}
+
+function getIconImg(g) {
+  const kids = JSON.parse(localStorage.getItem('kidsIcons') || '[]');
+  const found = kids.find(k => k.name === g.name);
+  if (found && found.imageDataUrl) {
+    return `<img src="${found.imageDataUrl}" alt="${g.name}">`;
+  }
+  return `<span class="img-upload-hint">📷<br>画像</span>`;
+}
+
+function uploadIcon(i, file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const kids = JSON.parse(localStorage.getItem('kidsIcons') || '[]');
+    const name = gomiData[i].name;
+    const idx = kids.findIndex(k => k.name === name);
+    const entry = { id: Date.now(), name, imageDataUrl: e.target.result };
+    if (idx >= 0) kids[idx] = entry; else kids.push(entry);
+    localStorage.setItem('kidsIcons', JSON.stringify(kids));
+    renderList();
+    showToast('画像を登録したよ！');
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearIcon(i) {
+  const kids = JSON.parse(localStorage.getItem('kidsIcons') || '[]');
+  const name = gomiData[i].name;
+  const filtered = kids.filter(k => k.name !== name);
+  localStorage.setItem('kidsIcons', JSON.stringify(filtered));
+  renderList();
+  showToast('画像を削除したよ');
+}
+
+function getIcon(g) {
+  const kids = JSON.parse(localStorage.getItem('kidsIcons') || '[]');
+  const found = kids.find(k => k.name === g.name);
+  if (found && found.imageDataUrl) {
+    return `<img src="${found.imageDataUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:8px;">`;
+  }
+  return g.emoji;
+}
+
+
+let formImageDataUrl = null;
+let iconMode = 'emoji';
+
+function setIconMode(mode) {
+  iconMode = mode;
+  document.getElementById('iconModeEmoji').style.display = mode === 'emoji' ? 'block' : 'none';
+  document.getElementById('iconModeImage').style.display = mode === 'image' ? 'block' : 'none';
+  const btnEmoji = document.getElementById('modeEmoji');
+  const btnImage = document.getElementById('modeImage');
+  if (mode === 'emoji') {
+    btnEmoji.style.background = '#111'; btnEmoji.style.color = '#fff'; btnEmoji.style.borderColor = '#111';
+    btnImage.style.background = '#fff'; btnImage.style.color = '#999'; btnImage.style.borderColor = '#e8e8e8';
+  } else {
+    btnImage.style.background = '#111'; btnImage.style.color = '#fff'; btnImage.style.borderColor = '#111';
+    btnEmoji.style.background = '#fff'; btnEmoji.style.color = '#999'; btnEmoji.style.borderColor = '#e8e8e8';
+  }
+}
+
+function handleFormImage(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    formImageDataUrl = e.target.result;
+    document.getElementById('imgPreviewImg').src = e.target.result;
+    document.getElementById('imgPreviewImg').style.display = 'block';
+    document.getElementById('imgPreviewHint').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearFormImage() {
+  formImageDataUrl = null;
+  document.getElementById('imgPreviewImg').style.display = 'none';
+  document.getElementById('imgPreviewImg').src = '';
+  document.getElementById('imgPreviewHint').style.display = 'block';
+}
+
+function deleteGomi(i) {
+  if (!confirm('「' + gomiData[i].name + '」を削除する？')) return;
+  gomiData.splice(i, 1);
+  saveData(); renderList(); scheduleAll();
+  showToast('削除したよ');
+}
+
+function toggleGomi(i) {
+  gomiData[i].enabled = !(gomiData[i].enabled !== false);
+  saveData(); renderList(); scheduleAll();
+}
+
+// アラームUI
+function buildAlarmRows(alarms) { alarmRows = alarms.map(a => ({...a})); renderAlarmRows(); }
+function renderAlarmRows() {
+  document.getElementById('alarmRows').innerHTML = alarmRows.map((a, i) => `
+    <div class="alarm-row">
+      <select onchange="alarmRows[${i}].daysBefore=parseInt(this.value)">
+        ${[2,1,0].map(d => `<option value="${d}" ${a.daysBefore===d?'selected':''}>${d===0?'当日':d+'日前'}</option>`).join('')}
+      </select>
+      <input type="time" value="${a.time}" onchange="alarmRows[${i}].time=this.value">
+      <button class="rm-alarm" onclick="removeAlarmRow(${i})">×</button>
+    </div>`).join('');
+}
+function addAlarmRow() { alarmRows.push({ daysBefore:1, time:'20:00' }); renderAlarmRows(); }
+function removeAlarmRow(i) { alarmRows.splice(i,1); renderAlarmRows(); }
+
+function renderFormExtras(selectedWeeks) {
+  document.getElementById('emojiRow').innerHTML = EMOJIS.map(e =>
+    `<div class="emoji-opt ${e===selectedEmoji?'selected':''}" onclick="selectEmoji('${e}')">${e}</div>`).join('');
+  document.getElementById('colorDots').innerHTML = COLORS.map(c =>
+    `<div class="color-dot ${c===selectedColor?'selected':''}" style="background:${c}" onclick="selectColor('${c}')"></div>`).join('');
+  document.getElementById('dayCheckboxes').innerHTML = DAYS.map((d,i) =>
+    `<div class="day-check"><input type="checkbox" id="day${i}" value="${d}"><span>${d}</span></div>`).join('');
+  document.getElementById('weekCheckboxes').innerHTML = [1,2,3,4,5].map(w =>
+    `<div class="week-check"><input type="checkbox" id="week${w}" value="${w}" ${(selectedWeeks||[]).includes(w)?'checked':''}><span>第${w}週</span></div>`).join('');
+}
+function selectEmoji(e) {
+  selectedEmoji = e;
+  document.querySelectorAll('.emoji-opt').forEach(el => el.classList.toggle('selected', el.textContent===e));
+}
+function selectColor(c) {
+  selectedColor = c;
+  document.querySelectorAll('.color-dot').forEach(el => el.classList.toggle('selected', el.style.backgroundColor===hexToRgb(c)));
+}
+function hexToRgb(hex) {
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function openForm(index) {
+  editIndex = index;
+  formImageDataUrl = null;
+  iconMode = 'emoji';
+  if (index===null) {
+    selectedEmoji=EMOJIS[0]; selectedColor=COLORS[0];
+    renderFormExtras([]);
+    document.getElementById('inputName').value='';
+    DAYS.forEach((_,i)=>document.getElementById('day'+i).checked=false);
+    buildAlarmRows([{daysBefore:1,time:'20:00'}]);
+    document.getElementById('formTitle').textContent='新しいゴミを追加';
+  } else {
+    const g=gomiData[index]; selectedEmoji=g.emoji; selectedColor=g.color;
+    renderFormExtras(g.weeks||[]);
+    document.getElementById('inputName').value=g.name;
+    DAYS.forEach((d,i)=>document.getElementById('day'+i).checked=g.days.includes(d));
+    buildAlarmRows(g.alarms||[]);
+    document.getElementById('formTitle').textContent='編集';
+    // 既存画像があればimageモードで開く
+    const kids = JSON.parse(localStorage.getItem('kidsIcons') || '[]');
+    const existing = kids.find(k => k.name === gomiData[index].name);
+    if (existing && existing.imageDataUrl) {
+      formImageDataUrl = existing.imageDataUrl;
+      setTimeout(() => {
+        setIconMode('image');
+        document.getElementById('imgPreviewImg').src = existing.imageDataUrl;
+        document.getElementById('imgPreviewImg').style.display = 'block';
+        document.getElementById('imgPreviewHint').style.display = 'none';
+      }, 0);
+    } else {
+      setTimeout(() => setIconMode('emoji'), 0);
+    }
+  }
+  document.getElementById('addForm').style.display='block';
+  document.getElementById('addForm').scrollIntoView({behavior:'smooth'});
+}
+function cancelForm() { document.getElementById('addForm').style.display='none'; }
+
+function saveGomi() {
+  const name=document.getElementById('inputName').value.trim();
+  if (!name) { showToast('名前を入れてね'); return; }
+  const days=DAYS.filter((_,i)=>document.getElementById('day'+i).checked);
+  const weeks=[1,2,3,4,5].filter(w=>document.getElementById('week'+w).checked);
+  const item={emoji:selectedEmoji,name,color:selectedColor,days,weeks,alarms:alarmRows.filter(a=>a.time),enabled:true};
+  // 画像モードなら保存
+  const kids = JSON.parse(localStorage.getItem('kidsIcons') || '[]');
+  const kidIdx = kids.findIndex(k => k.name === name);
+  if (iconMode === 'image' && formImageDataUrl) {
+    const entry = { id: Date.now(), name, imageDataUrl: formImageDataUrl };
+    if (kidIdx >= 0) kids[kidIdx] = entry; else kids.push(entry);
+  } else if (iconMode === 'emoji' && kidIdx >= 0) {
+    kids.splice(kidIdx, 1); // 絵文字モードなら画像削除
+  }
+  localStorage.setItem('kidsIcons', JSON.stringify(kids));
+  if (editIndex===null) gomiData.push(item); else gomiData[editIndex]=item;
+  saveData(); renderList(); cancelForm(); scheduleAll();
+  showToast(editIndex===null?'追加したよ！':'更新したよ！'); editIndex=null;
+}
+
+async function requestNotify() {
+  if (!('Notification' in window)) { showToast('このブラウザは通知非対応'); return; }
+  const perm=await Notification.requestPermission();
+  if (perm==='granted') {
+    document.getElementById('notifyBtn').textContent='✅ 通知ON';
+    document.getElementById('notifyBtn').classList.add('granted');
+    showToast('通知が許可されました！'); scheduleAll();
+  } else showToast('通知が拒否されました');
+}
+
+function scheduleAll() {
+  if (Notification.permission!=='granted') return;
+  const now=new Date();
+  for (const g of gomiData) {
+    if (g.enabled===false) continue;
+    for (const alarm of (g.alarms||[])) {
+      const [hh,mm]=alarm.time.split(':').map(Number);
+      for (let ahead=0; ahead<=14; ahead++) {
+        const target=new Date(now); target.setDate(now.getDate()+ahead);
+        if (!isCollectionDay(g,target)) continue;
+        const fire=new Date(target); fire.setDate(target.getDate()-alarm.daysBefore); fire.setHours(hh,mm,0,0);
+        const delay=fire-now;
+        if (delay>0 && delay<15*24*60*60*1000) {
+          const msg=alarm.daysBefore===0?`今日は${g.emoji} ${g.name}の日！`:`${alarm.daysBefore===1?'明日':alarm.daysBefore+'日後'}は${g.emoji} ${g.name}の日！そろそろ準備して`;
+          setTimeout(()=>new Notification('🗑️ ゴミ出しアラーム',{body:msg}),delay);
+        }
+      }
+    }
+  }
+}
+
+// 初期化
+window.addEventListener('load', () => {
+  applyDayTheme();
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  if (Notification.permission==='granted') {
+    document.getElementById('notifyBtn').textContent='✅ 通知ON';
+    document.getElementById('notifyBtn').classList.add('granted');
+    scheduleAll();
+  }
+
+  if (!gomiData.length) {
+    gomiData=[
+      {emoji:'🔥',name:'可燃ごみ',        color:'#e94560',days:['月','木'],weeks:[],   alarms:[{daysBefore:1,time:'21:00'},{daysBefore:0,time:'07:00'}],enabled:true},
+      {emoji:'🪨',name:'不燃ごみ',        color:'#a29bfe',days:['水'],     weeks:[3],  alarms:[{daysBefore:2,time:'20:00'},{daysBefore:1,time:'20:00'}],enabled:true},
+      {emoji:'♻️',name:'資源化物',        color:'#4ecdc4',days:['金'],     weeks:[2,4],alarms:[{daysBefore:2,time:'20:00'},{daysBefore:1,time:'20:00'},{daysBefore:0,time:'07:00'}],enabled:true},
+      {emoji:'🧴',name:'プラスチック資源',  color:'#74b9ff',days:['火'],weeks:[],   alarms:[{daysBefore:1,time:'20:00'},{daysBefore:0,time:'07:00'}],enabled:true},
+      {emoji:'🔌',name:'小型家電回収ボックス',color:'#C77DFF',days:[],    weeks:[],   alarms:[],enabled:true},
+      {emoji:'🛋️',name:'粗大ごみ',            color:'#FF6B6B',days:[],    weeks:[],   alarms:[{daysBefore:3,time:'20:00'}],enabled:true},
+    ];
+    saveData();
+  }
+  renderList();
+});
+</script>
+</body>
+</html>
