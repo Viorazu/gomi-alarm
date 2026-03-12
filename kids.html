@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ゴミ出しアラーム — 子どもアイコン版</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    background: #f5f5f5;
+    color: #222;
+    min-height: 100vh;
+    padding: 32px 16px 80px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    font-weight: 900;
+    margin-bottom: 6px;
+    color: #1a1a2e;
+  }
+  .subtitle {
+    font-size: 0.82rem;
+    color: #888;
+    margin-bottom: 32px;
+  }
+
+  /* ゴミカード */
+  .gomi-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 480px;
+  }
+
+  .gomi-card {
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  /* アイコンエリア */
+  .icon-area {
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
+    border: 2px dashed #ccc;
+    background: #f8f8f8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+  .icon-area:hover { border-color: #aaa; }
+  .icon-area img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+  }
+  .icon-placeholder {
+    font-size: 0.65rem;
+    color: #bbb;
+    text-align: center;
+    line-height: 1.4;
+    pointer-events: none;
+  }
+  .icon-area input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  /* ゴミ情報 */
+  .gomi-info { flex: 1; }
+  .gomi-name-input {
+    font-size: 1rem;
+    font-weight: 700;
+    border: none;
+    border-bottom: 1px solid #eee;
+    background: transparent;
+    color: #1a1a2e;
+    width: 100%;
+    padding: 2px 0;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    outline: none;
+    margin-bottom: 6px;
+  }
+  .gomi-name-input:focus { border-bottom-color: #aaa; }
+  .gomi-days {
+    font-size: 0.75rem;
+    color: #888;
+  }
+
+  /* 追加ボタン */
+  .add-btn {
+    max-width: 480px;
+    width: 100%;
+    background: none;
+    border: 2px dashed #ccc;
+    border-radius: 16px;
+    padding: 16px;
+    font-size: 0.9rem;
+    color: #aaa;
+    cursor: pointer;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+  .add-btn:hover { border-color: #888; color: #555; }
+
+  /* 削除ボタン */
+  .delete-btn {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px;
+    transition: color 0.2s;
+    flex-shrink: 0;
+  }
+  .delete-btn:hover { color: #e94560; }
+
+  /* 保存バナー */
+  .save-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: white;
+    border-top: 1px solid #eee;
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .save-btn {
+    background: #1a1a2e;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 32px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+  }
+  .reset-btn {
+    background: none;
+    border: 1px solid #ddd;
+    color: #aaa;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 72px; left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: #1a1a2e;
+    color: white;
+    padding: 10px 24px;
+    border-radius: 32px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    transition: transform 0.3s;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* 開発者向けコメント */
+  .dev-note {
+    max-width: 480px;
+    background: #fffbe6;
+    border: 1px solid #ffe58f;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.78rem;
+    color: #666;
+    margin-bottom: 24px;
+    line-height: 1.7;
+  }
+  .dev-note strong { color: #333; }
+</style>
+</head>
+<body>
+
+<h1>🎨 ゴミ出しアラーム — アイコン登録</h1>
+<p class="subtitle">子どもたちが描いた絵をゴミのアイコンにしよう</p>
+
+<div class="dev-note">
+  <strong>開発者へのメモ：</strong><br>
+  このページで登録した画像データ（Base64）と名前は localStorage の <code>kidsIcons</code> に保存されます。<br>
+  メインのゴミ出しアプリ（gomi-clean.html）側で <code>localStorage.getItem('kidsIcons')</code> を読み込んで、絵文字の代わりに img タグで表示してください。
+</div>
+
+<div class="gomi-grid" id="gomiGrid"></div>
+<button class="add-btn" onclick="addCard()">＋ ゴミの種類を追加</button>
+
+<div class="save-bar">
+  <button class="save-btn" onclick="saveAll()">💾 保存する</button>
+  <button class="reset-btn" onclick="resetAll()">リセット</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// データ構造
+// { id, name, imageDataUrl }
+// ============================================================
+
+let items = [];
+
+const DEFAULTS = [
+  { id: 1, name: '可燃ごみ',          imageDataUrl: null },
+  { id: 2, name: '不燃ごみ',          imageDataUrl: null },
+  { id: 3, name: '資源化物',          imageDataUrl: null },
+  { id: 4, name: 'プラスチック資源',  imageDataUrl: null },
+  { id: 5, name: '小型家電回収ボックス', imageDataUrl: null },
+  { id: 6, name: '粗大ごみ',          imageDataUrl: null },
+];
+
+function load() {
+  const saved = localStorage.getItem('kidsIcons');
+  items = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULTS));
+}
+
+function saveAll() {
+  localStorage.setItem('kidsIcons', JSON.stringify(items));
+  showToast('保存したよ！');
+}
+
+function resetAll() {
+  if (!confirm('全部リセットする？')) return;
+  items = JSON.parse(JSON.stringify(DEFAULTS));
+  localStorage.removeItem('kidsIcons');
+  render();
+  showToast('リセットしたよ');
+}
+
+function addCard() {
+  const id = Date.now();
+  items.push({ id, name: '新しいゴミ', imageDataUrl: null });
+  render();
+}
+
+function deleteCard(id) {
+  if (!confirm('削除する？')) return;
+  items = items.filter(x => x.id !== id);
+  render();
+}
+
+function updateName(id, value) {
+  const item = items.find(x => x.id === id);
+  if (item) item.name = value;
+}
+
+function handleImage(id, file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const item = items.find(x => x.id === id);
+    if (item) {
+      item.imageDataUrl = e.target.result;
+      render();
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function render() {
+  const grid = document.getElementById('gomiGrid');
+  grid.innerHTML = items.map(item => `
+    <div class="gomi-card">
+      <div class="icon-area" title="タップして画像を選ぶ">
+        ${item.imageDataUrl
+          ? `<img src="${item.imageDataUrl}" alt="${item.name}">`
+          : `<span class="icon-placeholder">ここに<br>絵を<br>アップロード</span>`
+        }
+        <input type="file" accept="image/*"
+          onchange="handleImage(${item.id}, this.files[0])">
+      </div>
+      <div class="gomi-info">
+        <input class="gomi-name-input" type="text"
+          value="${item.name}"
+          onchange="updateName(${item.id}, this.value)"
+          placeholder="ゴミの名前">
+        <div class="gomi-days">曜日設定はメインアプリで</div>
+      </div>
+      <button class="delete-btn" onclick="deleteCard(${item.id})">×</button>
+    </div>
+  `).join('');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// 起動
+load();
+render();
+</script>
+</body>
+</html>
